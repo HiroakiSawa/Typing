@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة الكتابة العربية - Arabic Typing Game</title>
+    <link rel="stylesheet" href="style.css" type="text/css">
+    <script src="words.js"></script>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1 class="title">لعبة الكتابة العربية</h1>
+            <p class="subtitle">Arabic Typing Game - アラビア語タイピングゲーム</p>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-value" id="score">0</span>
+                <span class="stat-label">النقاط / Score</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="wpm">0</span>
+                <span class="stat-label">كلمة/دقيقة / WPM</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="accuracy">100%</span>
+                <span class="stat-label">الدقة / Accuracy</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value" id="time">60</span>
+                <span class="stat-label">الوقت / Time</span>
+            </div>
+        </div>
+        <div class="word-display">
+            <div class="current-word" id="currentWord">ファイルを読み込み中...</div>
+            <div class="word-meaning" id="wordMeaning"></div>
+        </div>
+        <div class="input-area">
+            <input type="text" class="typing-input" id="typingInput" placeholder="اكتب الكلمة هنا..." disabled>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="startBtn">ابدأ / Start</button>
+            <button class="btn btn-secondary" id="resetBtn">إعادة تشغيل / Reset</button>
+        </div>
+
+        <div class="game-over" id="gameOver">
+            <h2>انتهت اللعبة! / Game Over!</h2>
+            <p id="finalStats"></p>
+        </div>
+    </div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <script>
+        class ArabicTypingGame {
+            constructor() {
+                // ゲーム設定
+                this.GAME_TIME_SECONDS = 60;
+                this.SCORE_PER_WORD = 10;
+                this.FEEDBACK_DURATION_MS = 1000;
+                this.AUTO_CHECK_DELAY_MS = 100;
+
+                // プロパティ初期化
+                this.wordData = [];
+                this.currentWord = '';
+                this.currentMeaning = '';
+                this.score = 0;
+                this.totalWords = 0;
+                this.correctWords = 0;
+                this.startTime = null;
+                this.gameTime = this.GAME_TIME_SECONDS;
+                this.timeLeft = this.GAME_TIME_SECONDS;
+                this.gameActive = false;
+                this.timer = null;
+                
+                // 外部ファイルから単語リストを読み込む
+                this.loadWords();
+                
+                // DOM要素の取得とイベントの設定
+                this.initializeElements();
+                this.bindEvents();
+            }
+
+            loadWords() {
+                // words.jsで定義したグローバル変数 `arabicWords` を使う
+                if (typeof arabicWords !== 'undefined' && arabicWords.length > 0) {
+                    this.wordData = arabicWords;
+                    console.log(`Loaded ${this.wordData.length} words from words.js`);
+                } else {
+                    // 万が一読み込めなかった場合の予備データ
+                    console.error("単語ファイル(words.js)が読み込めませんでした。");
+                    this.wordData = [{arabic: 'خطأ', meaning: 'エラー'}];
+                }
+            }
+
+            initializeElements() {
+                this.currentWordElement = document.getElementById('currentWord');
+                this.wordMeaningElement = document.getElementById('wordMeaning');
+                this.typingInput = document.getElementById('typingInput');
+                this.scoreElement = document.getElementById('score');
+                this.wpmElement = document.getElementById('wpm');
+                this.accuracyElement = document.getElementById('accuracy');
+                this.timeElement = document.getElementById('time');
+                this.startBtn = document.getElementById('startBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.gameOverElement = document.getElementById('gameOver');
+                this.finalStatsElement = document.getElementById('finalStats');
+                this.feedbackElement = document.getElementById('feedback');
+                this.progressFill = document.getElementById('progressFill');
+            }
+            
+            bindEvents() {
+                this.startBtn.addEventListener('click', () => this.startGame());
+                this.resetBtn.addEventListener('click', () => this.resetGame());
+                this.typingInput.addEventListener('input', (e) => this.handleInput(e));
+                this.typingInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.checkWord();
+                    }
+                });
+            }
+
+            startGame() {
+                if (this.wordData.length === 0 || this.wordData[0].arabic === 'خطأ') {
+                    alert('単語データが正しく読み込まれていません。words.jsファイルを確認してください。');
+                    return;
+                }
+                
+                this.gameActive = true;
+                this.startTime = Date.now();
+                this.timeLeft = this.gameTime;
+                this.typingInput.disabled = false;
+                this.typingInput.focus();
+                this.startBtn.textContent = 'جاري اللعب... / Playing...';
+                this.startBtn.disabled = true;
+                this.gameOverElement.style.display = 'none';
+                
+                this.generateNewWord();
+                this.startTimer();
+            }
+
+            startTimer() {
+                this.timer = setInterval(() => {
+                    this.timeLeft--;
+                    this.timeElement.textContent = this.timeLeft;
+                    this.updateProgressBar();
+                    
+                    if (this.timeLeft <= 0) {
+                        this.endGame();
+                    }
+                }, 1000);
+            }
+
+            updateProgressBar() {
+                const progress = ((this.gameTime - this.timeLeft) / this.gameTime) * 100;
+                this.progressFill.style.width = progress + '%';
+            }
+
+            generateNewWord() {
+                if (this.wordData.length === 0) return;
+                
+                const randomIndex = Math.floor(Math.random() * this.wordData.length);
+                const wordObj = this.wordData[randomIndex];
+                
+                this.currentWord = wordObj.arabic;
+                this.currentMeaning = wordObj.meaning;
+                
+                this.currentWordElement.textContent = this.currentWord;
+                this.wordMeaningElement.textContent = `意味: ${this.currentMeaning}`;
+                this.typingInput.value = '';
+            }
+
+            handleInput(e) {
+                if (!this.gameActive) return;
+                const inputValue = e.target.value.trim();
+                if (inputValue === this.currentWord) {
+                    setTimeout(() => this.checkWord(), this.AUTO_CHECK_DELAY_MS);
+                }
+            }
+
+            checkWord() {
+                if (!this.gameActive) return;
+                
+                const inputValue = this.typingInput.value.trim();
+                this.totalWords++;
+                
+                if (inputValue === this.currentWord) {
+                    this.correctWords++;
+                    this.score += this.SCORE_PER_WORD;
+                    this.showFeedback('أحسنت! / Excellent!', 'correct');
+                    this.generateNewWord();
+                } else {
+                    this.showFeedback('حاول مرة أخرى / Try Again!', 'incorrect');
+                    this.typingInput.value = '';
+                }
+                
+                this.updateStats();
+            }
+
+            showFeedback(message, type) {
+                this.feedbackElement.textContent = message;
+                this.feedbackElement.className = `feedback ${type} show`;
+                
+                setTimeout(() => {
+                    this.feedbackElement.classList.remove('show');
+                }, this.FEEDBACK_DURATION_MS);
+            }
+
+            updateStats() {
+                this.scoreElement.textContent = this.score;
+                
+                const accuracy = this.totalWords > 0 ? 
+                    Math.round((this.correctWords / this.totalWords) * 100) : 100;
+                this.accuracyElement.textContent = accuracy + '%';
+                
+                const timeElapsed = (Date.now() - this.startTime) / 1000 / 60;
+                const wpm = timeElapsed > 0 ? Math.round(this.correctWords / timeElapsed) : 0;
+                this.wpmElement.textContent = wpm;
+            }
+
+            endGame() {
+                this.gameActive = false;
+                clearInterval(this.timer);
+                this.typingInput.disabled = true;
+                this.startBtn.textContent = 'ابدأ / Start';
+                this.startBtn.disabled = false;
+                
+                const accuracy = this.totalWords > 0 ? 
+                    Math.round((this.correctWords / this.totalWords) * 100) : 100;
+                const wpm = Math.round(this.correctWords / (this.gameTime / 60));
+                
+                this.finalStatsElement.innerHTML = `
+                    <strong>النتيجة النهائية / Final Results:</strong><br>
+                    النقاط / Score: ${this.score}<br>
+                    الكلمات الصحيحة / Correct Words: ${this.correctWords}<br>
+                    إجمالي الكلمات / Total Words: ${this.totalWords}<br>
+                    الدقة / Accuracy: ${accuracy}%<br>
+                    كلمة في الدقيقة / WPM: ${wpm}
+                `;
+                
+                this.gameOverElement.style.display = 'block';
+                this.progressFill.style.width = '100%';
+            }
+
+            resetGame() {
+                if (this.timer) clearInterval(this.timer);
+                this.gameActive = false;
+                
+                this.score = 0;
+                this.totalWords = 0;
+                this.correctWords = 0;
+                this.timeLeft = this.gameTime;
+                this.startTime = null;
+                
+                this.scoreElement.textContent = '0';
+                this.wpmElement.textContent = '0';
+                this.accuracyElement.textContent = '100%';
+                this.timeElement.textContent = this.gameTime;
+                this.progressFill.style.width = '0%';
+                
+                this.currentWordElement.textContent = 'اضغط ابدأ للعب';
+                this.wordMeaningElement.textContent = '';
+                this.typingInput.value = '';
+                this.typingInput.disabled = true;
+                this.startBtn.textContent = 'ابدأ / Start';
+                this.startBtn.disabled = false;
+                this.gameOverElement.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ArabicTypingGame();
+        });
+    </script>
+</body>
+</html>
