@@ -9,7 +9,7 @@ const arabicWords = [
   { arabic: 'بخير', meaning: '元気だ' },
   { arabic: 'جدا', meaning: 'とても' },
   { arabic: 'حال', meaning: '状態' },
-  { arabic: 'ذٰلك', meaning: 'あの人・あれ' },
+  { arabic: 'ذلك', meaning: 'あの人・あれ' },
   { arabic: 'طالب', meaning: '学生' },
   { arabic: 'ظريفة', meaning: 'ザリーファ（女性名）' },
   { arabic: 'قليلا', meaning: '少し' },
@@ -20,7 +20,7 @@ const arabicWords = [
   { arabic: 'محمد', meaning: 'ムハンマド（男性名）' },
   { arabic: 'مدرس', meaning: '教師' },
   { arabic: 'مشهور', meaning: '有名な' },
-  { arabic: 'هٰذا', meaning: 'こちら・これ' },
+  { arabic: 'هذا', meaning: 'こちら・これ' },
   { arabic: 'هو', meaning: '彼（主格）' },
   { arabic: 'هي', meaning: '彼女（主格）' },
   { arabic: 'و', meaning: 'そして' },
@@ -109,4 +109,5 @@ const arabicWords = [
   { arabic: 'مبنى', meaning: '建物' },
   { arabic: 'صديق', meaning: '友人' },
   { arabic: 'صيني', meaning: '中国人の（中国人）' },
+
 ];
